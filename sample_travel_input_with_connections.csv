@@ -1,0 +1,6 @@
+departure_country,departure_city,departure_date,departure_time,arrival_country,arrival_city,arrival_date,arrival_time,notes,source_file,next_country_match,next_city_match
+US,New York (JFK),2024-01-15,14:30,FR,Paris (CDG),2024-01-16,06:45,Flight (Air France AF123),Original,✅,✅
+FR,Paris (CDG),2024-01-20,10:15,IT,Rome (FCO),2024-01-20,12:30,Flight (Alitalia AZ456),Original,✅,✅
+IT,Rome (FCO),2024-01-25,16:20,ES,Madrid (MAD),2024-01-25,18:35,Flight (Iberia IB789),Original,✅,✅
+ES,Madrid (MAD),2024-01-30,09:00,ES,Barcelona (BCN),2024-01-30,10:30,Train (Renfe AVE),Original,✅,✅
+ES,Barcelona (BCN),2024-02-05,13:45,US,New York (JFK),2024-02-05,16:20,Flight (Delta DL987),Original,N/A,N/A
