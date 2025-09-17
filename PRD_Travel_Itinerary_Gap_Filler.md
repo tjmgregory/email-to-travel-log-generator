@@ -83,7 +83,8 @@ A Python-based system that automatically identifies and fills gaps in personal t
 - Parse .eml email files from export
 - Extract headers (subject, sender, date)
 - Extract and clean email content (text and HTML)
-- Filter emails for travel-related content
+- Filter emails for travel-related content using comprehensive keyword matching
+- **Gap location filtering**: Include city and country names from identified gaps in search criteria
 - Search emails up to 12 months before travel dates (advance bookings)
 - Include emails from gap periods plus buffer zones
 
@@ -91,6 +92,7 @@ A Python-based system that automatically identifies and fills gaps in personal t
 - Use OpenAI GPT-4 for travel information extraction
 - Parse emails by time periods for context
 - Extract structured travel data (departure/arrival cities, dates, times, notes)
+- **Multi-flight extraction**: Handle multiple flight details in single emails (e.g., connected flights, round trips)
 - Validate extracted data quality
 - Detect car lifts and informal transportation methods
 - Focus on specific gap-filling connections
@@ -123,6 +125,26 @@ A Python-based system that automatically identifies and fills gaps in personal t
 - Report suspicious patterns in travel data
 - Provide recommendations for data cleanup
 
+**FR-8: Enhanced Email Filtering**
+- **Gap location search**: Include city and country names from identified gaps in email filtering
+- **Contextual filtering**: Search for emails mentioning specific gap locations (e.g., "Bangkok", "Kuala Lumpur")
+- **Comprehensive coverage**: Ensure no relevant emails are missed due to location-specific content
+- **Smart keyword expansion**: Dynamically add gap location terms to search criteria
+
+**FR-9: Multi-Flight AI Extraction**
+- **Connected flight handling**: Extract multiple flight segments from single emails
+- **Round trip detection**: Identify outbound and return flights in same email
+- **Complex itineraries**: Handle multi-city trips and layover connections
+- **Batch processing**: Process all flight details in one AI call per email
+- **Structured output**: Return multiple travel entries per email when applicable
+
+**FR-10: Country Code Normalization**
+- **ISO 3166-1 alpha-2 compliance**: Ensure all country codes use standard 2-letter format
+- **Automatic normalization**: Convert common variations to ISO codes (UK → GB, United Kingdom → GB)
+- **AI prompt consistency**: Include country code standards in AI extraction prompts
+- **Data validation**: Validate country codes during data processing
+- **Consistency enforcement**: Prevent mixing of different country code formats
+
 #### 5.2 Data Requirements
 
 **Input Data**:
@@ -143,6 +165,12 @@ departure_country,departure_city,departure_date,departure_time,
 arrival_country,arrival_city,arrival_date,arrival_time,notes,
 source_file
 ```
+
+**Country Code Standards**:
+- **Format**: ISO 3166-1 alpha-2 country codes (2-letter codes)
+- **Examples**: `GB` (United Kingdom), `US` (United States), `FR` (France), `DE` (Germany)
+- **Consistency**: All country codes must use the same standard throughout the dataset
+- **Normalization**: Convert common variations to ISO codes (e.g., `UK` → `GB`, `United Kingdom` → `GB`)
 
 #### 5.3 Quality Requirements
 

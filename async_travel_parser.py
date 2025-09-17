@@ -58,6 +58,25 @@ class AsyncTravelParser:
             reader = csv.DictReader(f)
             self.travel_data = list(reader)
         
+        # Normalize country codes in all entries
+        print("Normalizing country codes to ISO 3166-1 alpha-2 format...")
+        normalized_count = 0
+        for entry in self.travel_data:
+            original_departure = entry.get('departure_country', '')
+            original_arrival = entry.get('arrival_country', '')
+            
+            normalized_entry = self.normalize_travel_entry_country_codes(entry)
+            
+            if (normalized_entry.get('departure_country', '') != original_departure or 
+                normalized_entry.get('arrival_country', '') != original_arrival):
+                normalized_count += 1
+            
+            # Update the entry with normalized country codes
+            entry.update(normalized_entry)
+        
+        if normalized_count > 0:
+            print(f"Normalized country codes in {normalized_count} entries")
+        
         # Sort data chronologically by departure date
         self.travel_data = self.sort_travel_data_chronologically(self.travel_data)
         print(f"Loaded {len(self.travel_data)} travel entries (sorted chronologically)")
@@ -288,15 +307,694 @@ class AsyncTravelParser:
             ]
         
         return keywords
+    
+    def get_gap_location_keywords(self, gaps: List[Dict]) -> List[str]:
+        """Extract location keywords from gaps for enhanced email filtering"""
+        gap_keywords = []
+        
+        for gap in gaps:
+            # Add city names
+            current_city = gap.get('current_arrival', '').lower().strip()
+            next_city = gap.get('next_departure', '').lower().strip()
+            
+            if current_city:
+                gap_keywords.append(current_city)
+            if next_city:
+                gap_keywords.append(next_city)
+            
+            # Add country names
+            current_country = gap.get('current_arrival_country', '').lower().strip()
+            next_country = gap.get('next_departure_country', '').lower().strip()
+            
+            if current_country:
+                gap_keywords.append(current_country)
+            if next_country:
+                gap_keywords.append(next_country)
+            
+            # Add common country name variations
+            country_variations = {
+                'gb': ['united kingdom', 'uk', 'britain', 'england', 'scotland', 'wales'],
+                'us': ['united states', 'usa', 'america'],
+                'th': ['thailand'],
+                'my': ['malaysia'],
+                'sg': ['singapore'],
+                'id': ['indonesia'],
+                'ph': ['philippines'],
+                'vn': ['vietnam'],
+                'kh': ['cambodia'],
+                'la': ['laos'],
+                'mm': ['myanmar', 'burma'],
+                'bn': ['brunei'],
+                'fr': ['france'],
+                'de': ['germany'],
+                'it': ['italy'],
+                'es': ['spain'],
+                'nl': ['netherlands', 'holland'],
+                'be': ['belgium'],
+                'ch': ['switzerland'],
+                'at': ['austria'],
+                'dk': ['denmark'],
+                'se': ['sweden'],
+                'no': ['norway'],
+                'fi': ['finland'],
+                'pl': ['poland'],
+                'cz': ['czech republic', 'czechia'],
+                'hu': ['hungary'],
+                'sk': ['slovakia'],
+                'si': ['slovenia'],
+                'hr': ['croatia'],
+                'rs': ['serbia'],
+                'bg': ['bulgaria'],
+                'ro': ['romania'],
+                'gr': ['greece'],
+                'tr': ['turkey'],
+                'ru': ['russia'],
+                'ua': ['ukraine'],
+                'by': ['belarus'],
+                'lt': ['lithuania'],
+                'lv': ['latvia'],
+                'ee': ['estonia'],
+                'ie': ['ireland'],
+                'pt': ['portugal'],
+                'lu': ['luxembourg'],
+                'mt': ['malta'],
+                'cy': ['cyprus'],
+                'is': ['iceland'],
+                'li': ['liechtenstein'],
+                'mc': ['monaco'],
+                'ad': ['andorra'],
+                'sm': ['san marino'],
+                'va': ['vatican'],
+                'jp': ['japan'],
+                'kr': ['south korea', 'korea'],
+                'cn': ['china'],
+                'tw': ['taiwan'],
+                'hk': ['hong kong'],
+                'mo': ['macau'],
+                'in': ['india'],
+                'pk': ['pakistan'],
+                'bd': ['bangladesh'],
+                'lk': ['sri lanka'],
+                'mv': ['maldives'],
+                'np': ['nepal'],
+                'bt': ['bhutan'],
+                'af': ['afghanistan'],
+                'ir': ['iran'],
+                'iq': ['iraq'],
+                'sy': ['syria'],
+                'lb': ['lebanon'],
+                'jo': ['jordan'],
+                'il': ['israel'],
+                'ps': ['palestine'],
+                'sa': ['saudi arabia'],
+                'ae': ['united arab emirates', 'uae'],
+                'qa': ['qatar'],
+                'kw': ['kuwait'],
+                'bh': ['bahrain'],
+                'om': ['oman'],
+                'ye': ['yemen'],
+                'eg': ['egypt'],
+                'ly': ['libya'],
+                'tn': ['tunisia'],
+                'dz': ['algeria'],
+                'ma': ['morocco'],
+                'sd': ['sudan'],
+                'ss': ['south sudan'],
+                'et': ['ethiopia'],
+                'er': ['eritrea'],
+                'dj': ['djibouti'],
+                'so': ['somalia'],
+                'ke': ['kenya'],
+                'ug': ['uganda'],
+                'tz': ['tanzania'],
+                'rw': ['rwanda'],
+                'bi': ['burundi'],
+                'mw': ['malawi'],
+                'zm': ['zambia'],
+                'zw': ['zimbabwe'],
+                'bw': ['botswana'],
+                'na': ['namibia'],
+                'za': ['south africa'],
+                'sz': ['swaziland', 'eswatini'],
+                'ls': ['lesotho'],
+                'mg': ['madagascar'],
+                'mu': ['mauritius'],
+                'sc': ['seychelles'],
+                'km': ['comoros'],
+                'mz': ['mozambique'],
+                'ao': ['angola'],
+                'cd': ['congo', 'democratic republic of congo'],
+                'cg': ['congo', 'republic of congo'],
+                'cf': ['central african republic'],
+                'td': ['chad'],
+                'cm': ['cameroon'],
+                'gq': ['equatorial guinea'],
+                'ga': ['gabon'],
+                'st': ['sao tome and principe'],
+                'gh': ['ghana'],
+                'tg': ['togo'],
+                'bj': ['benin'],
+                'ne': ['niger'],
+                'bf': ['burkina faso'],
+                'ml': ['mali'],
+                'sn': ['senegal'],
+                'gm': ['gambia'],
+                'gw': ['guinea-bissau'],
+                'gn': ['guinea'],
+                'sl': ['sierra leone'],
+                'lr': ['liberia'],
+                'ci': ['ivory coast', 'cote d\'ivoire'],
+                'gh': ['ghana'],
+                'tg': ['togo'],
+                'bj': ['benin'],
+                'ne': ['niger'],
+                'bf': ['burkina faso'],
+                'ml': ['mali'],
+                'sn': ['senegal'],
+                'gm': ['gambia'],
+                'gw': ['guinea-bissau'],
+                'gn': ['guinea'],
+                'sl': ['sierra leone'],
+                'lr': ['liberia'],
+                'ci': ['ivory coast', 'cote d\'ivoire'],
+                'ca': ['canada'],
+                'mx': ['mexico'],
+                'gt': ['guatemala'],
+                'bz': ['belize'],
+                'sv': ['el salvador'],
+                'hn': ['honduras'],
+                'ni': ['nicaragua'],
+                'cr': ['costa rica'],
+                'pa': ['panama'],
+                'cu': ['cuba'],
+                'jm': ['jamaica'],
+                'ht': ['haiti'],
+                'do': ['dominican republic'],
+                'pr': ['puerto rico'],
+                'tt': ['trinidad and tobago'],
+                'bb': ['barbados'],
+                'ag': ['antigua and barbuda'],
+                'dm': ['dominica'],
+                'gd': ['grenada'],
+                'kn': ['saint kitts and nevis'],
+                'lc': ['saint lucia'],
+                'vc': ['saint vincent and the grenadines'],
+                'bs': ['bahamas'],
+                'ar': ['argentina'],
+                'bo': ['bolivia'],
+                'br': ['brazil'],
+                'cl': ['chile'],
+                'co': ['colombia'],
+                'ec': ['ecuador'],
+                'fk': ['falkland islands'],
+                'gf': ['french guiana'],
+                'gy': ['guyana'],
+                'py': ['paraguay'],
+                'pe': ['peru'],
+                'sr': ['suriname'],
+                'uy': ['uruguay'],
+                've': ['venezuela'],
+                'au': ['australia'],
+                'nz': ['new zealand'],
+                'fj': ['fiji'],
+                'pg': ['papua new guinea'],
+                'sb': ['solomon islands'],
+                'vu': ['vanuatu'],
+                'nc': ['new caledonia'],
+                'pf': ['french polynesia'],
+                'ws': ['samoa'],
+                'to': ['tonga'],
+                'ki': ['kiribati'],
+                'tv': ['tuvalu'],
+                'nr': ['nauru'],
+                'pw': ['palau'],
+                'fm': ['micronesia'],
+                'mh': ['marshall islands'],
+                'as': ['american samoa'],
+                'gu': ['guam'],
+                'mp': ['northern mariana islands'],
+                'vi': ['us virgin islands'],
+                'vg': ['british virgin islands'],
+                'ai': ['anguilla'],
+                'aw': ['aruba'],
+                'bq': ['bonaire'],
+                'cw': ['curacao'],
+                'sx': ['sint maarten'],
+                'bl': ['saint barthelemy'],
+                'mf': ['saint martin'],
+                'gp': ['guadeloupe'],
+                'mq': ['martinique'],
+                're': ['reunion'],
+                'yt': ['mayotte'],
+                'sh': ['saint helena'],
+                'ac': ['ascension island'],
+                'ta': ['tristan da cunha'],
+                'gs': ['south georgia and the south sandwich islands'],
+                'hm': ['heard island and mcdonald islands'],
+                'tf': ['french southern territories'],
+                'aq': ['antarctica'],
+                'bv': ['bouvet island'],
+                'sj': ['svalbard and jan mayen'],
+                'no': ['norway'],
+                'gl': ['greenland'],
+                'fo': ['faroe islands'],
+                'ax': ['aland islands'],
+                'je': ['jersey'],
+                'gg': ['guernsey'],
+                'im': ['isle of man'],
+                'gi': ['gibraltar'],
+                'ad': ['andorra'],
+                'sm': ['san marino'],
+                'va': ['vatican'],
+                'li': ['liechtenstein'],
+                'mc': ['monaco'],
+                'mt': ['malta'],
+                'cy': ['cyprus'],
+                'tr': ['turkey'],
+                'ru': ['russia'],
+                'ua': ['ukraine'],
+                'by': ['belarus'],
+                'md': ['moldova'],
+                'ro': ['romania'],
+                'bg': ['bulgaria'],
+                'gr': ['greece'],
+                'al': ['albania'],
+                'me': ['montenegro'],
+                'rs': ['serbia'],
+                'ba': ['bosnia and herzegovina'],
+                'hr': ['croatia'],
+                'si': ['slovenia'],
+                'sk': ['slovakia'],
+                'cz': ['czech republic', 'czechia'],
+                'hu': ['hungary'],
+                'at': ['austria'],
+                'ch': ['switzerland'],
+                'li': ['liechtenstein'],
+                'de': ['germany'],
+                'lu': ['luxembourg'],
+                'be': ['belgium'],
+                'nl': ['netherlands', 'holland'],
+                'dk': ['denmark'],
+                'se': ['sweden'],
+                'no': ['norway'],
+                'fi': ['finland'],
+                'is': ['iceland'],
+                'ie': ['ireland'],
+                'gb': ['united kingdom', 'uk', 'britain', 'england', 'scotland', 'wales'],
+                'fr': ['france'],
+                'es': ['spain'],
+                'pt': ['portugal'],
+                'it': ['italy'],
+                'mt': ['malta'],
+                'cy': ['cyprus'],
+                'gr': ['greece'],
+                'tr': ['turkey'],
+                'ru': ['russia'],
+                'ua': ['ukraine'],
+                'by': ['belarus'],
+                'md': ['moldova'],
+                'ro': ['romania'],
+                'bg': ['bulgaria'],
+                'al': ['albania'],
+                'me': ['montenegro'],
+                'rs': ['serbia'],
+                'ba': ['bosnia and herzegovina'],
+                'hr': ['croatia'],
+                'si': ['slovenia'],
+                'sk': ['slovakia'],
+                'cz': ['czech republic', 'czechia'],
+                'hu': ['hungary'],
+                'at': ['austria'],
+                'ch': ['switzerland'],
+                'li': ['liechtenstein'],
+                'de': ['germany'],
+                'lu': ['luxembourg'],
+                'be': ['belgium'],
+                'nl': ['netherlands', 'holland'],
+                'dk': ['denmark'],
+                'se': ['sweden'],
+                'no': ['norway'],
+                'fi': ['finland'],
+                'is': ['iceland'],
+                'ie': ['ireland'],
+                'gb': ['united kingdom', 'uk', 'britain', 'england', 'scotland', 'wales'],
+                'fr': ['france'],
+                'es': ['spain'],
+                'pt': ['portugal'],
+                'it': ['italy']
+            }
+            
+            # Add country variations
+            if current_country in country_variations:
+                gap_keywords.extend(country_variations[current_country])
+            if next_country in country_variations:
+                gap_keywords.extend(country_variations[next_country])
+        
+        # Remove duplicates and empty strings
+        gap_keywords = list(set([kw for kw in gap_keywords if kw.strip()]))
+        
+        return gap_keywords
+    
+    def normalize_country_code(self, country_code: str) -> str:
+        """Normalize country codes to ISO 3166-1 alpha-2 format"""
+        if not country_code or country_code.strip() == '':
+            return 'Unknown'
+        
+        country_code = country_code.strip().upper()
+        
+        # Common country code mappings to ISO 3166-1 alpha-2
+        country_mappings = {
+            'UK': 'GB',  # United Kingdom
+            'UNITED KINGDOM': 'GB',
+            'BRITAIN': 'GB',
+            'ENGLAND': 'GB',
+            'SCOTLAND': 'GB',
+            'WALES': 'GB',
+            'USA': 'US',  # United States
+            'UNITED STATES': 'US',
+            'AMERICA': 'US',
+            'USA': 'US',
+            'DEUTSCHLAND': 'DE',  # Germany
+            'ALLEMAGNE': 'DE',
+            'FRANCE': 'FR',
+            'ESPANA': 'ES',  # Spain
+            'SPAIN': 'ES',
+            'ITALIA': 'IT',  # Italy
+            'ITALY': 'IT',
+            'NEDERLAND': 'NL',  # Netherlands
+            'HOLLAND': 'NL',
+            'NEDERLANDEN': 'NL',
+            'BELGIE': 'BE',  # Belgium
+            'BELGIUM': 'BE',
+            'SCHWEIZ': 'CH',  # Switzerland
+            'SUISSE': 'CH',
+            'SVIZZERA': 'CH',
+            'OSTERREICH': 'AT',  # Austria
+            'AUSTRIA': 'AT',
+            'DANMARK': 'DK',  # Denmark
+            'DENMARK': 'DK',
+            'SVERIGE': 'SE',  # Sweden
+            'SWEDEN': 'SE',
+            'NORGE': 'NO',  # Norway
+            'NORWAY': 'NO',
+            'SUOMI': 'FI',  # Finland
+            'FINLAND': 'FI',
+            'ISLAND': 'IS',  # Iceland
+            'ICELAND': 'IS',
+            'EIRE': 'IE',  # Ireland
+            'IRELAND': 'IE',
+            'POLSKA': 'PL',  # Poland
+            'POLAND': 'PL',
+            'CESKA REPUBLIKA': 'CZ',  # Czech Republic
+            'CZECH REPUBLIC': 'CZ',
+            'CZECHIA': 'CZ',
+            'MAGYARORSZAG': 'HU',  # Hungary
+            'HUNGARY': 'HU',
+            'SLOVENSKO': 'SK',  # Slovakia
+            'SLOVAKIA': 'SK',
+            'SLOVENIJA': 'SI',  # Slovenia
+            'SLOVENIA': 'SI',
+            'HRVATSKA': 'HR',  # Croatia
+            'CROATIA': 'HR',
+            'SRBIJA': 'RS',  # Serbia
+            'SERBIA': 'RS',
+            'BULGARIA': 'BG',
+            'ROMANIA': 'RO',
+            'ELLADA': 'GR',  # Greece
+            'GREECE': 'GR',
+            'TURKIYE': 'TR',  # Turkey
+            'TURKEY': 'TR',
+            'ROSSIYA': 'RU',  # Russia
+            'RUSSIA': 'RU',
+            'UKRAINA': 'UA',  # Ukraine
+            'UKRAINE': 'UA',
+            'BELARUS': 'BY',
+            'LITHUANIA': 'LT',
+            'LATVIA': 'LV',
+            'ESTONIA': 'EE',
+            'PORTUGAL': 'PT',
+            'LUXEMBOURG': 'LU',
+            'MALTA': 'MT',
+            'CYPRUS': 'CY',
+            'LIECHTENSTEIN': 'LI',
+            'MONACO': 'MC',
+            'ANDORRA': 'AD',
+            'SAN MARINO': 'SM',
+            'VATICAN': 'VA',
+            'JAPAN': 'JP',
+            'NIPPON': 'JP',
+            'KOREA': 'KR',
+            'SOUTH KOREA': 'KR',
+            'CHINA': 'CN',
+            'TAIWAN': 'TW',
+            'HONG KONG': 'HK',
+            'MACAU': 'MO',
+            'INDIA': 'IN',
+            'PAKISTAN': 'PK',
+            'BANGLADESH': 'BD',
+            'SRI LANKA': 'LK',
+            'MALDIVES': 'MV',
+            'NEPAL': 'NP',
+            'BHUTAN': 'BT',
+            'AFGHANISTAN': 'AF',
+            'IRAN': 'IR',
+            'IRAQ': 'IQ',
+            'SYRIA': 'SY',
+            'LEBANON': 'LB',
+            'JORDAN': 'JO',
+            'ISRAEL': 'IL',
+            'PALESTINE': 'PS',
+            'SAUDI ARABIA': 'SA',
+            'UAE': 'AE',
+            'UNITED ARAB EMIRATES': 'AE',
+            'QATAR': 'QA',
+            'KUWAIT': 'KW',
+            'BAHRAIN': 'BH',
+            'OMAN': 'OM',
+            'YEMEN': 'YE',
+            'EGYPT': 'EG',
+            'LIBYA': 'LY',
+            'TUNISIA': 'TN',
+            'ALGERIA': 'DZ',
+            'MOROCCO': 'MA',
+            'SUDAN': 'SD',
+            'SOUTH SUDAN': 'SS',
+            'ETHIOPIA': 'ET',
+            'ERITREA': 'ER',
+            'DJIBOUTI': 'DJ',
+            'SOMALIA': 'SO',
+            'KENYA': 'KE',
+            'UGANDA': 'UG',
+            'TANZANIA': 'TZ',
+            'RWANDA': 'RW',
+            'BURUNDI': 'BI',
+            'MALAWI': 'MW',
+            'ZAMBIA': 'ZM',
+            'ZIMBABWE': 'ZW',
+            'BOTSWANA': 'BW',
+            'NAMIBIA': 'NA',
+            'SOUTH AFRICA': 'ZA',
+            'ESWATINI': 'SZ',
+            'LESOTHO': 'LS',
+            'MADAGASCAR': 'MG',
+            'MAURITIUS': 'MU',
+            'SEYCHELLES': 'SC',
+            'COMOROS': 'KM',
+            'MOZAMBIQUE': 'MZ',
+            'ANGOLA': 'AO',
+            'CONGO': 'CD',
+            'DEMOCRATIC REPUBLIC OF CONGO': 'CD',
+            'REPUBLIC OF CONGO': 'CG',
+            'CENTRAL AFRICAN REPUBLIC': 'CF',
+            'CHAD': 'TD',
+            'CAMEROON': 'CM',
+            'EQUATORIAL GUINEA': 'GQ',
+            'GABON': 'GA',
+            'SAO TOME AND PRINCIPE': 'ST',
+            'GHANA': 'GH',
+            'TOGO': 'TG',
+            'BENIN': 'BJ',
+            'NIGER': 'NE',
+            'BURKINA FASO': 'BF',
+            'MALI': 'ML',
+            'SENEGAL': 'SN',
+            'GAMBIA': 'GM',
+            'GUINEA-BISSAU': 'GW',
+            'GUINEA': 'GN',
+            'SIERRA LEONE': 'SL',
+            'LIBERIA': 'LR',
+            'IVORY COAST': 'CI',
+            'COTE D\'IVOIRE': 'CI',
+            'CANADA': 'CA',
+            'MEXICO': 'MX',
+            'GUATEMALA': 'GT',
+            'BELIZE': 'BZ',
+            'EL SALVADOR': 'SV',
+            'HONDURAS': 'HN',
+            'NICARAGUA': 'NI',
+            'COSTA RICA': 'CR',
+            'PANAMA': 'PA',
+            'CUBA': 'CU',
+            'JAMAICA': 'JM',
+            'HAITI': 'HT',
+            'DOMINICAN REPUBLIC': 'DO',
+            'PUERTO RICO': 'PR',
+            'TRINIDAD AND TOBAGO': 'TT',
+            'BARBADOS': 'BB',
+            'ANTIGUA AND BARBUDA': 'AG',
+            'DOMINICA': 'DM',
+            'GRENADA': 'GD',
+            'SAINT KITTS AND NEVIS': 'KN',
+            'SAINT LUCIA': 'LC',
+            'SAINT VINCENT AND THE GRENADINES': 'VC',
+            'BAHAMAS': 'BS',
+            'ARGENTINA': 'AR',
+            'BOLIVIA': 'BO',
+            'BRAZIL': 'BR',
+            'CHILE': 'CL',
+            'COLOMBIA': 'CO',
+            'ECUADOR': 'EC',
+            'FALKLAND ISLANDS': 'FK',
+            'FRENCH GUIANA': 'GF',
+            'GUYANA': 'GY',
+            'PARAGUAY': 'PY',
+            'PERU': 'PE',
+            'SURINAME': 'SR',
+            'URUGUAY': 'UY',
+            'VENEZUELA': 'VE',
+            'AUSTRALIA': 'AU',
+            'NEW ZEALAND': 'NZ',
+            'FIJI': 'FJ',
+            'PAPUA NEW GUINEA': 'PG',
+            'SOLOMON ISLANDS': 'SB',
+            'VANUATU': 'VU',
+            'NEW CALEDONIA': 'NC',
+            'FRENCH POLYNESIA': 'PF',
+            'SAMOA': 'WS',
+            'TONGA': 'TO',
+            'KIRIBATI': 'KI',
+            'TUVALU': 'TV',
+            'NAURU': 'NR',
+            'PALAU': 'PW',
+            'MICRONESIA': 'FM',
+            'MARSHALL ISLANDS': 'MH',
+            'AMERICAN SAMOA': 'AS',
+            'GUAM': 'GU',
+            'NORTHERN MARIANA ISLANDS': 'MP',
+            'US VIRGIN ISLANDS': 'VI',
+            'BRITISH VIRGIN ISLANDS': 'VG',
+            'ANGUILLA': 'AI',
+            'ARUBA': 'AW',
+            'BONAIRE': 'BQ',
+            'CURACAO': 'CW',
+            'SINT MAARTEN': 'SX',
+            'SAINT BARTHELEMY': 'BL',
+            'SAINT MARTIN': 'MF',
+            'GUADELOUPE': 'GP',
+            'MARTINIQUE': 'MQ',
+            'REUNION': 'RE',
+            'MAYOTTE': 'YT',
+            'SAINT HELENA': 'SH',
+            'ASCENSION ISLAND': 'AC',
+            'TRISTAN DA CUNHA': 'TA',
+            'SOUTH GEORGIA AND THE SOUTH SANDWICH ISLANDS': 'GS',
+            'HEARD ISLAND AND MCDONALD ISLANDS': 'HM',
+            'FRENCH SOUTHERN TERRITORIES': 'TF',
+            'ANTARCTICA': 'AQ',
+            'BOUVET ISLAND': 'BV',
+            'SVALBARD AND JAN MAYEN': 'SJ',
+            'GREENLAND': 'GL',
+            'FAROE ISLANDS': 'FO',
+            'ALAND ISLANDS': 'AX',
+            'JERSEY': 'JE',
+            'GUERNSEY': 'GG',
+            'ISLE OF MAN': 'IM',
+            'GIBRALTAR': 'GI',
+            'ANDORRA': 'AD',
+            'SAN MARINO': 'SM',
+            'VATICAN': 'VA',
+            'LIECHTENSTEIN': 'LI',
+            'MONACO': 'MC',
+            'MALTA': 'MT',
+            'CYPRUS': 'CY',
+            'TURKEY': 'TR',
+            'RUSSIA': 'RU',
+            'UKRAINE': 'UA',
+            'BELARUS': 'BY',
+            'MOLDOVA': 'MD',
+            'ROMANIA': 'RO',
+            'BULGARIA': 'BG',
+            'ALBANIA': 'AL',
+            'MONTENEGRO': 'ME',
+            'SERBIA': 'RS',
+            'BOSNIA AND HERZEGOVINA': 'BA',
+            'CROATIA': 'HR',
+            'SLOVENIA': 'SI',
+            'SLOVAKIA': 'SK',
+            'CZECH REPUBLIC': 'CZ',
+            'CZECHIA': 'CZ',
+            'HUNGARY': 'HU',
+            'AUSTRIA': 'AT',
+            'SWITZERLAND': 'CH',
+            'LIECHTENSTEIN': 'LI',
+            'GERMANY': 'DE',
+            'LUXEMBOURG': 'LU',
+            'BELGIUM': 'BE',
+            'NETHERLANDS': 'NL',
+            'DENMARK': 'DK',
+            'SWEDEN': 'SE',
+            'NORWAY': 'NO',
+            'FINLAND': 'FI',
+            'ICELAND': 'IS',
+            'IRELAND': 'IE',
+            'UNITED KINGDOM': 'GB',
+            'FRANCE': 'FR',
+            'SPAIN': 'ES',
+            'PORTUGAL': 'PT',
+            'ITALY': 'IT'
+        }
+        
+        # Check mappings first (including common 2-letter variations)
+        if country_code in country_mappings:
+            return country_mappings[country_code]
+        
+        # If no mapping found, check if it's already a valid ISO code (2 letters)
+        if len(country_code) == 2 and country_code.isalpha():
+            return country_code
+        
+        # If no mapping found and not 2-letter, return as-is
+        return country_code
+    
+    def normalize_travel_entry_country_codes(self, entry: Dict) -> Dict:
+        """Normalize country codes in a travel entry"""
+        normalized_entry = entry.copy()
+        
+        # Normalize departure and arrival country codes
+        if 'departure_country' in normalized_entry:
+            normalized_entry['departure_country'] = self.normalize_country_code(normalized_entry['departure_country'])
+        
+        if 'arrival_country' in normalized_entry:
+            normalized_entry['arrival_country'] = self.normalize_country_code(normalized_entry['arrival_country'])
+        
+        return normalized_entry
 
     async def search_travel_emails_async(self) -> List[Dict]:
-        """Search for travel-related emails using async processing with comprehensive keywords"""
+        """Search for travel-related emails using async processing with comprehensive keywords and gap location filtering"""
         start_time = time.time()
         print("Searching for travel-related emails asynchronously...")
         
         # Load comprehensive travel keywords
         travel_keywords = self.load_travel_keywords()
-        print(f"Loaded {len(travel_keywords)} travel keywords for filtering")
+        
+        # Add gap location keywords for enhanced filtering
+        gap_keywords = []
+        if hasattr(self, 'gaps') and self.gaps:
+            gap_keywords = self.get_gap_location_keywords(self.gaps)
+            print(f"Added {len(gap_keywords)} gap location keywords for enhanced filtering")
+        
+        # Combine all keywords
+        all_keywords = travel_keywords + gap_keywords
+        print(f"Loaded {len(travel_keywords)} travel keywords + {len(gap_keywords)} gap location keywords = {len(all_keywords)} total keywords")
         
         # Get all email files
         email_files = glob.glob(os.path.join(self.email_dir, "*.eml"))
@@ -328,10 +1026,10 @@ class AsyncTravelParser:
                     sender = result['sender'].lower()
                     content = result['content'].lower()
                     
-                    # Check if email might contain travel info
-                    if any(keyword in subject for keyword in travel_keywords) or \
-                       any(keyword in sender for keyword in travel_keywords) or \
-                       any(keyword in content for keyword in travel_keywords):
+                    # Check if email might contain travel info using all keywords
+                    if any(keyword in subject for keyword in all_keywords) or \
+                       any(keyword in sender for keyword in all_keywords) or \
+                       any(keyword in content for keyword in all_keywords):
                         batch_travel_emails.append(result)
                         keyword_matches += 1
                 
@@ -556,6 +1254,9 @@ Please analyze the following emails and extract any travel information that coul
 - Car rentals, train tickets, bus bookings
 - Car lifts, informal transportation
 - Any travel between the gap locations
+- **Multiple flight details in single emails (connected flights, round trips, multi-city itineraries)**
+
+IMPORTANT: If an email contains multiple flight segments (e.g., outbound and return flights, connected flights, layovers), extract ALL of them as separate entries. Each flight segment should be a separate entry in the JSON array.
 
 EMAILS TO ANALYZE:
 {email_content}
@@ -575,6 +1276,12 @@ Return ONLY a JSON array of travel entries in this format:
     "source_file": "filename.eml"
   }}
 ]
+
+IMPORTANT COUNTRY CODE REQUIREMENTS:
+- Use ISO 3166-1 alpha-2 country codes (2-letter codes only)
+- Examples: GB (United Kingdom), US (United States), FR (France), DE (Germany)
+- Common mappings: UK → GB, United Kingdom → GB, USA → US, United States → US
+- Do NOT use full country names or 3-letter codes
 
 If no travel information is found, return an empty array [].
 """
@@ -923,6 +1630,9 @@ If no travel information is found, return an empty array [].
             cleaned_entry['departure_time'] = ''
         if cleaned_entry['arrival_time'] in ['Unknown', 'null', '']:
             cleaned_entry['arrival_time'] = ''
+        
+        # Normalize country codes to ISO 3166-1 alpha-2 format
+        cleaned_entry = self.normalize_travel_entry_country_codes(cleaned_entry)
             
         return cleaned_entry
     
@@ -1029,7 +1739,7 @@ If no travel information is found, return an empty array [].
         gap_time = time.time() - gap_start
         print(f"📊 Gap identification: {gap_time:.2f}s")
         
-        # Search for travel-related emails asynchronously
+        # Search for travel-related emails asynchronously (with gap location filtering)
         search_start = time.time()
         travel_emails = await self.search_travel_emails_async()
         search_time = time.time() - search_start
